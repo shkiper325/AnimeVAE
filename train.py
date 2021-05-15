@@ -186,13 +186,13 @@ def main():
 
                 N = np.array([generate_standart_normal(HIDDEN_SIZE) for i in range(IMG_GEN_COUNT)])
                 N = nets.FloatTensor(N)
-                images = out_image = B(N).detach().cpu().numpy() #???
+                images = out_image = B(N).detach().cpu().numpy()
 
                 path = os.path.join(OUT_IMAGE_FOLDER, str(img_gen_iter // IMG_GEN_FREQ))
 
                 for i in range(IMG_GEN_COUNT):
                     if not os.path.exists(path):
-                        os.mkdir(path)
+                        os.makedirs(path)
 
                     img = np.clip(images[i] + 1, 0, 2-0.001) / 2 * 256.0
                     img = img.astype(np.uint8)
