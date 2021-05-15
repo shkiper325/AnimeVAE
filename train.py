@@ -18,7 +18,14 @@ DATA_PATH = 'data'
 OUT_IMAGE_FOLDER = 'images'
 
 def data_iter(path, batch_size):
+    if not os.path.exists(path):
+        print('Path not found')
+        quit(1)
+
     filenames = os.listdir(DATA_PATH)
+    if filenames == []:
+        print('Files not found')
+        quit(1)
 
     ret = np.empty((batch_size, 3, IMAGE_SIDE, IMAGE_SIDE))
     ret_iter = 0    
