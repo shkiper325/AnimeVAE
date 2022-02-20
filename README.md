@@ -24,4 +24,4 @@ Dataset I used contains 60000 anime faces cropped from images I fetched from dan
 For your own data put your images to the "data" folder in the root directory.
 For different (not 60 px) image side change IMAGE_SIDE in train.py and neural networks configuration in nets.py.
 
-[Trained model](https://drive.google.com/file/d/1yUsdGvbNNffSxMMbCIjgDW18cD1nO3ga/view?usp=sharing)
+[Trained model](https://drive.google.com/file/d/1IVXg_Ny6YSJ-TMGeyhh8pxtBbqqwBo_w/view?usp=sharing)
