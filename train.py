@@ -17,8 +17,6 @@ import torch
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-import nets
-
 
 def get_latest_model(models_dir):
     """
@@ -124,7 +122,7 @@ def load_images(data_path, image_size, batch_size):
                 batch_idx = 0
 
 
-def save_generated_images(decoder, output_dir, iteration, num_images, latent_dim):
+def save_generated_images(decoder, output_dir, iteration, num_images, latent_dim, use_cuda):
     """
     Generate and save images from random latent vectors.
 
@@ -134,10 +132,11 @@ def save_generated_images(decoder, output_dir, iteration, num_images, latent_dim
         iteration (int): Current iteration number (used for folder naming)
         num_images (int): Number of images to generate
         latent_dim (int): Dimension of latent space
+        use_cuda (bool): Whether to use CUDA
     """
     # Sample random latent vectors
     z = torch.randn(num_images, latent_dim)
-    if nets.USE_CUDA:
+    if use_cuda:
         z = z.cuda()
 
     # Generate images
@@ -227,8 +226,10 @@ def main():
     # Network architecture
     parser.add_argument('--latent-dim', type=int, default=128,
                         help='Dimension of latent space (default: 128)')
-    parser.add_argument('--base-channels', type=int, default=64,
-                        help='Base number of channels in networks (default: 64)')
+    parser.add_argument('--base-channels', type=int, default=None,
+                        help='Base number of channels in networks (default: 64 for standard, 128 for --deeper)')
+    parser.add_argument('--deeper', action='store_true',
+                        help='Use deeper networks (2x residual blocks, higher capacity)')
 
     # Training hyperparameters
     parser.add_argument('--epochs', type=int, default=500,
@@ -255,6 +256,20 @@ def main():
                         help='Disable TensorBoard logging')
 
     args = parser.parse_args()
+
+    # Import appropriate network module
+    if args.deeper:
+        import nets_high as nets
+        print("Using DEEP architecture (nets_high)")
+        # Set default base_channels for deeper networks
+        if args.base_channels is None:
+            args.base_channels = 96
+    else:
+        import nets
+        print("Using standard architecture (nets)")
+        # Set default base_channels for standard networks
+        if args.base_channels is None:
+            args.base_channels = 64
 
     # Setup TensorBoard
     writer = None
@@ -366,7 +381,7 @@ def main():
                 # Save to disk
                 save_generated_images(
                     decoder, args.output_dir, img_set_num,
-                    args.num_gen_images, args.latent_dim
+                    args.num_gen_images, args.latent_dim, nets.USE_CUDA
                 )
 
                 # Log to TensorBoard
