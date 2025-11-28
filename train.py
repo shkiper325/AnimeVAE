@@ -347,6 +347,10 @@ def main():
         encoder.apply(init_weights_xavier)
         decoder.apply(init_weights_xavier)
 
+        # Save initial weights
+        print("Saving initial weights...")
+        save_checkpoint(encoder, decoder, optimizer, 0, 0, args, args.models_dir)
+
     # Training loop
     print(f"Starting training for {args.epochs} epochs")
     for epoch in range(start_epoch, args.epochs):
