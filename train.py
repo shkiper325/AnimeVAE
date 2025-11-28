@@ -14,8 +14,27 @@ import numpy as np
 import cv2
 
 import torch
+import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
+
+
+def init_weights_xavier(m):
+    """
+    Initialize network weights using Xavier initialization.
+
+    Args:
+        m: PyTorch module to initialize
+    """
+    if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d, nn.Linear)):
+        nn.init.xavier_uniform_(m.weight)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
+    elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+        if m.weight is not None:
+            nn.init.constant_(m.weight, 1)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
 
 
 def get_latest_model(models_dir):
@@ -302,6 +321,7 @@ def main():
     # Training state
     start_epoch = 0
     iteration = 0
+    cold_start = True  # Track if this is a cold start
 
     # Auto-load latest checkpoint
     if not args.no_auto_load:
@@ -314,11 +334,18 @@ def main():
             optimizer.load_state_dict(checkpoint['optimizer'])
             start_epoch = checkpoint.get('epoch', 0)
             iteration = checkpoint.get('iteration', 0)
+            cold_start = False
             print(f"Resumed from epoch {start_epoch}, iteration {iteration}")
         else:
             print(f"No checkpoint found in {args.models_dir}, starting from scratch")
     else:
         print("Auto-load disabled, starting from scratch")
+
+    # Initialize weights with Xavier for cold start
+    if cold_start:
+        print("Initializing weights with Xavier initialization")
+        encoder.apply(init_weights_xavier)
+        decoder.apply(init_weights_xavier)
 
     # Training loop
     print(f"Starting training for {args.epochs} epochs")
