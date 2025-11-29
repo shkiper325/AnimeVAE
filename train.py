@@ -75,7 +75,7 @@ def save_checkpoint(encoder, decoder, optimizer, epoch, iteration, args, models_
     os.makedirs(models_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f'model_{timestamp}.bin'
+    filename = f'model_{timestamp}_{iteration}.bin'
     filepath = os.path.join(models_dir, filename)
 
     checkpoint = {
