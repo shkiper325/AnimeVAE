@@ -12,6 +12,7 @@ import glob
 
 import numpy as np
 import cv2
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -299,6 +300,8 @@ def main():
                         help='Number of images to generate (default: 16)')
     parser.add_argument('--no-tensorboard', action='store_true',
                         help='Disable TensorBoard logging')
+    parser.add_argument('--progressbar', action='store_true',
+                        help='Show progress bar during training instead of simple prints')
 
     args = parser.parse_args()
 
@@ -403,7 +406,7 @@ def main():
         print(f"\nEpoch {epoch}/{args.epochs}")
 
         # Train for one epoch
-        for batch_idx in range(epoch_len):
+        for batch_idx in tqdm(range(epoch_len)) if args.progressbar else range(epoch_len):
             # Get batch
             images = next(data_loader)
             images = torch.FloatTensor(images)
