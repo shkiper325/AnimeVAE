@@ -53,6 +53,23 @@ def init_weights_normal(m, args):
         if m.bias is not None:
             nn.init.constant_(m.bias, 0)
 
+def init_weights_kaiming_uniform(m, args):
+    """
+    Initialize network weights using Kaiming uniform initialization.
+
+    Args:
+        m: PyTorch module to initialize
+    """
+    if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d, nn.Linear)):
+        nn.init.kaiming_uniform_(m.weight, a=args.leaky_relu_slope,
+                                 mode=args.init_method_mode, nonlinearity='leaky_relu')
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
+    elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+        if m.weight is not None:
+            nn.init.normal_(m.weight, 1.0, args.normal_init_std)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
 
 def get_latest_model(models_dir):
     """
@@ -278,8 +295,10 @@ def main():
                         help='Leaky ReLU slope (default: 0.2)')
     parser.add_argument('--sigma-sq', type=float, default=0.0001,
                         help='Variance parameter for reconstruction loss (default: 0.0001)')
-    parser.add_argument('--init-method', type=str, choices=['xavier', 'normal'], default='normal',
+    parser.add_argument('--init-method', type=str, choices=['xavier', 'normal', 'kaiming'], default='normal',
                         help='Weight initialization method (default: normal)')
+    parser.add_argument('--init-method-mode', type=str, choices=['fan_in', 'fan_out'], default='fan_in',
+                        help='Kaiming initialization mode (default: fan_in)')
     parser.add_argument('--normal-init-mean', type=float, default=0,
                         help='Mean for normal initialization (default: 0)')
     parser.add_argument('--normal-init-std', type=float, default=0.02,
@@ -393,6 +412,10 @@ def main():
             print("Initializing weights with Xavier initialization")
             encoder.apply(init_weights_xavier)
             decoder.apply(init_weights_xavier)
+        elif args.init_method == 'kaiming':
+            print("Initializing weights with Kaiming uniform initialization")
+            encoder.apply(lambda m: init_weights_kaiming_uniform(m, args))
+            decoder.apply(lambda m: init_weights_kaiming_uniform(m, args))
         else:
             raise ValueError(f"Unknown initialization method: {args.init_method}")
 
