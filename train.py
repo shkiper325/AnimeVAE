@@ -350,11 +350,18 @@ def main():
         if args.base_channels is None:
             args.base_channels = 64
 
-    # Setup TensorBoard
+    # Setup TensorBoard with unique run name
     writer = None
     if not args.no_tensorboard:
-        writer = SummaryWriter(args.log_dir)
-        print(f"TensorBoard logging to: {args.log_dir}")
+        # Create unique run name with timestamp and key parameters
+        run_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_lat{args.latent_dim}_ch{args.base_channels}_lr{args.lr}"
+        log_path = os.path.join(args.log_dir, run_name)
+        writer = SummaryWriter(log_path)
+        print(f"TensorBoard logging to: {log_path}")
+
+        # Log all hyperparameters as text
+        hparams_text = "\n".join([f"{k}: {v}" for k, v in sorted(vars(args).items())])
+        writer.add_text('Hyperparameters', hparams_text, 0)
 
     # Calculate epoch length
     num_files = len([f for f in os.listdir(args.data_path)
