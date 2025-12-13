@@ -1,3 +1,6 @@
 .vscode/
-runs/
 __pycache__
+models/
+tb/
+images/
+run.sh
