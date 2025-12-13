@@ -18,7 +18,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-
 def init_weights_xavier(m):
     """
     Initialize network weights using Xavier initialization.
@@ -33,6 +32,23 @@ def init_weights_xavier(m):
     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
         if m.weight is not None:
             nn.init.constant_(m.weight, 1)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
+
+def init_weights_normal(m, args):
+    """
+    Initialize network weights using Normal initialization.
+
+    Args:
+        m: PyTorch module to initialize
+    """
+    if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d, nn.Linear)):
+        nn.init.normal_(m.weight, args.normal_init_mean, args.normal_init_std)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0)
+    elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+        if m.weight is not None:
+            nn.init.normal_(m.weight, 1.0, args.normal_init_std)
         if m.bias is not None:
             nn.init.constant_(m.bias, 0)
 
@@ -255,10 +271,20 @@ def main():
                         help='Number of training epochs (default: 500)')
     parser.add_argument('--batch-size', type=int, default=16,
                         help='Batch size for training (default: 16)')
-    parser.add_argument('--lr', type=float, default=0.0002,
-                        help='Learning rate (default: 0.0002)')
+    parser.add_argument('--lr', type=float, default=0.001,
+                        help='Learning rate (default: 0.001)')
+    parser.add_argument('--leaky-relu-slope', type=float, default=0.2,
+                        help='Leaky ReLU slope (default: 0.2)')
     parser.add_argument('--sigma-sq', type=float, default=0.0001,
                         help='Variance parameter for reconstruction loss (default: 0.0001)')
+    parser.add_argument('--init-method', type=str, choices=['xavier', 'normal'], default='normal',
+                        help='Weight initialization method (default: normal)')
+    parser.add_argument('--normal-init-mean', type=float, default=0,
+                        help='Mean for normal initialization (default: 0)')
+    parser.add_argument('--normal-init-std', type=float, default=0.02,
+                        help='Standard deviation for normal initialization (default: 0.02)')
+    parser.add_argument('--seed', type=int, default=-1,
+                        help='Random seed for reproducibility (default: -1, no seed)')
 
     # Logging and visualization
     parser.add_argument('--log-dir', type=str, default='runs',
@@ -276,8 +302,19 @@ def main():
 
     args = parser.parse_args()
 
+    # Random seed initialization
+    if args.seed >= 0:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed)
+        print(f"Using random seed: {args.seed}")
+    else:
+        print("No random seed specified, using default randomness")
+
     # Import appropriate network module
-    if args.deeper:
+    if False: # args.deeper:
         import nets_high as nets
         print("Using DEEP architecture (nets_high)")
         # Set default base_channels for deeper networks
@@ -286,6 +323,7 @@ def main():
     else:
         import nets
         print("Using standard architecture (nets)")
+        print("DEEP NETWORKS ARE DISABLED IN THIS VERSION")
         # Set default base_channels for standard networks
         if args.base_channels is None:
             args.base_channels = 64
@@ -308,7 +346,8 @@ def main():
     # Create networks
     encoder, decoder = nets.create_vae(
         latent_dim=args.latent_dim,
-        base_channels=args.base_channels
+        base_channels=args.base_channels,
+        leaky_relu_slope=args.leaky_relu_slope
     )
 
     # Optimizers
@@ -341,11 +380,18 @@ def main():
     else:
         print("Auto-load disabled, starting from scratch")
 
-    # Initialize weights with Xavier for cold start
+    # Initialize weights for cold start
     if cold_start:
-        print("Initializing weights with Xavier initialization")
-        encoder.apply(init_weights_xavier)
-        decoder.apply(init_weights_xavier)
+        if args.init_method == 'normal':
+            print("Initializing weights with Normal initialization")
+            encoder.apply(lambda m: init_weights_normal(m, args))
+            decoder.apply(lambda m: init_weights_normal(m, args))
+        elif args.init_method == 'xavier':
+            print("Initializing weights with Xavier initialization")
+            encoder.apply(init_weights_xavier)
+            decoder.apply(init_weights_xavier)
+        else:
+            raise ValueError(f"Unknown initialization method: {args.init_method}")
 
         # Save initial weights
         print("Saving initial weights...")
@@ -360,7 +406,9 @@ def main():
         for batch_idx in range(epoch_len):
             # Get batch
             images = next(data_loader)
-            images = nets.FloatTensor(images)
+            images = torch.FloatTensor(images)
+            if nets.USE_CUDA:
+                images = images.cuda()
 
             # Forward pass and compute loss
             optimizer.zero_grad()
