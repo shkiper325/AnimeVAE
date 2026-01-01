@@ -19,6 +19,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import ExponentialLR
 
 from torchvision.models import vgg19
 vgg = vgg19(pretrained=True).features[:36].eval()
@@ -398,6 +399,11 @@ def main():
         betas=(0.5, 0.999)
     )
 
+    # LR decay scheduler
+    total_steps = args.epochs * epoch_len
+    gamma = np.exp(np.log(0.001) / total_steps) # Final lr is 0.1% of initial
+    scheduler = ExponentialLR(optimizer, gamma=gamma, last_epoch=total_steps)
+
     # Training state
     start_epoch = 0
     iteration = 0
@@ -464,6 +470,9 @@ def main():
             # Backward pass
             total_loss.backward()
             optimizer.step()
+
+            # Update learning rate
+            scheduler.step()
 
             iteration += 1
 
