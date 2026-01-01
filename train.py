@@ -18,6 +18,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
+import torch.nn.functional as F
+
+from torchvision.models import vgg19
+vgg = vgg19(pretrained=True).features[:36].eval()
+
+def perceptual_loss(x, x_recon):
+    return F.mse_loss(vgg(x), vgg(x_recon))
 
 def init_weights_xavier(m):
     """
@@ -253,10 +260,13 @@ def compute_vae_loss(encoder, decoder, images, sigma_sq):
     recon_loss = recon_loss / (sigma_sq * image_size * image_size)
     recon_loss = recon_loss.mean()
 
-    # Total loss
-    total_loss = kl_loss + recon_loss
+    # Perceptual loss
+    perc_loss = perceptual_loss(images, reconstructed)
 
-    return total_loss, kl_loss.item(), recon_loss.item(), reconstructed
+    # Total loss
+    total_loss = kl_loss + recon_loss + perc_loss
+
+    return total_loss, kl_loss.item(), recon_loss.item(), perc_loss.item(), reconstructed
 
 
 def main():
@@ -447,7 +457,7 @@ def main():
 
             # Forward pass and compute loss
             optimizer.zero_grad()
-            total_loss, kl_loss, recon_loss, reconstructed = compute_vae_loss(
+            total_loss, kl_loss, recon_loss, perc_loss, reconstructed = compute_vae_loss(
                 encoder, decoder, images, args.sigma_sq
             )
 
@@ -465,11 +475,12 @@ def main():
             if writer is not None:
                 writer.add_scalar('Loss/KL', kl_loss, iteration)
                 writer.add_scalar('Loss/Reconstruction', recon_loss, iteration)
-                writer.add_scalar('Loss/Total', kl_loss + recon_loss, iteration)
+                writer.add_scalar('Loss/Perceptual', perc_loss, iteration)
+                writer.add_scalar('Loss/Total', kl_loss + recon_loss + perc_loss, iteration)
 
             # Print losses
             if iteration % args.plot_freq == 0:
-                print(f"  [{batch_idx}/{epoch_len}] KL: {kl_loss:.4f}, Recon: {recon_loss:.4f}")
+                print(f"  [{batch_idx}/{epoch_len}] KL: {kl_loss:.4f}, Recon: {recon_loss:.4f}, Perc: {perc_loss:.4f}")
 
                 # Log images to TensorBoard
                 if writer is not None:
