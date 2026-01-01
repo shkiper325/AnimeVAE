@@ -308,8 +308,8 @@ def main():
                         help='Leaky ReLU slope (default: 0.2)')
     parser.add_argument('--sigma-sq', type=float, default=0.0001,
                         help='Variance parameter for reconstruction loss (default: 0.0001)')
-    parser.add_argument('--init-method', type=str, choices=['xavier', 'normal', 'kaiming'], default='normal',
-                        help='Weight initialization method (default: normal)')
+    parser.add_argument('--init-method', type=str, choices=['xavier', 'normal', 'kaiming_uniform'], default='kaiming_uniform',
+                        help='Weight initialization method (default: kaiming_uniform)')
     parser.add_argument('--init-method-mode', type=str, choices=['fan_in', 'fan_out'], default='fan_in',
                         help='Kaiming initialization mode (default: fan_in)')
     parser.add_argument('--normal-init-mean', type=float, default=0,
@@ -437,7 +437,7 @@ def main():
             print("Initializing weights with Xavier initialization")
             encoder.apply(init_weights_xavier)
             decoder.apply(init_weights_xavier)
-        elif args.init_method == 'kaiming':
+        elif args.init_method == 'kaiming_uniform':
             print("Initializing weights with Kaiming uniform initialization")
             encoder.apply(lambda m: init_weights_kaiming_uniform(m, args))
             decoder.apply(lambda m: init_weights_kaiming_uniform(m, args))
