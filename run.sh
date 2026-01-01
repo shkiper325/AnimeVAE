@@ -4,7 +4,6 @@ for i in {1,10,100,1000,10000,100000}; do
     TRAIN_DIR="$HOME/unfiltered_128x128_faces/train"
     OUTPUT_DIR="sched-and-vgg-loss_${i}"
 
-    rm -rf "$OUTPUT_DIR"
     mkdir -p "$OUTPUT_DIR/images"
     mkdir -p "$OUTPUT_DIR/models"
     mkdir -p "$OUTPUT_DIR/tb"
