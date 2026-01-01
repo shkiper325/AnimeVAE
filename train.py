@@ -427,7 +427,7 @@ def main():
     # Optimizers
     optimizer = optim.Adam(
         list(encoder.parameters()) + list(decoder.parameters()),
-        lr=args.lr,
+        lr=args.lr if args.last_lr is None else args.last_lr,
         betas=(0.5, 0.999)
     )
 
