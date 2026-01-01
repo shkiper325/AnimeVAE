@@ -448,7 +448,7 @@ def main():
     scheduler = None
     if args.lr_scheduler == 'exp':
         total_steps = args.epochs * epoch_len
-        gamma = np.exp(np.log(0.001) / total_steps)  # Final lr is 0.1% of initial
+        gamma = np.exp(np.log(0.0001) / total_steps)  # Final lr is 0.01% of initial
         scheduler = ExponentialLR(optimizer, gamma=gamma, last_epoch=iteration - 1 if iteration > 0 else -1)
         print(f"Using ExponentialLR scheduler (gamma={gamma:.6f})")
     elif args.lr_scheduler == 'smart':
