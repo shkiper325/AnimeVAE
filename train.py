@@ -436,7 +436,7 @@ def main():
         latest_model = get_latest_model(args.models_dir)
         if latest_model:
             print(f"Loading latest checkpoint: {latest_model}")
-            checkpoint = torch.load(latest_model)
+            checkpoint = torch.load(latest_model, weights_only=False)
             start_epoch = checkpoint['epoch']
             iteration = checkpoint['iteration']
             global all_jpg_filenames, curr_jpg_idx
@@ -504,7 +504,7 @@ def main():
         print(f"\nEpoch {epoch}/{args.epochs}")
 
         # Train for one epoch
-        for batch_idx in tqdm(range(epoch_len-(iteration%epoch_len))) if args.progressbar else range(epoch_len-(iteration%epoch_len)):
+        for batch_idx in tqdm(range(iteration%epoch_len, epoch_len)) if args.progressbar else range(iteration%epoch_len, epoch_len):
             # Get batch
             images = next(data_loader)
             images = torch.FloatTensor(images)
