@@ -317,8 +317,6 @@ def main():
                         help='Number of epochs with no improvement for ReduceLROnPlateau (default: 5)')
     parser.add_argument('--reduce-lr-threshold', type=float, default=1e-4,
                         help='Threshold for measuring new optimum for ReduceLROnPlateau (default: 1e-4)')
-    parser.add_argument('--reduce-lr-verbose', action='store_true',
-                        help='Print message when learning rate is reduced by ReduceLROnPlateau')
     parser.add_argument('--leaky-relu-slope', type=float, default=0.2,
                         help='Leaky ReLU slope (default: 0.2)')
     parser.add_argument('--sigma-sq', type=float, default=0.0001,
@@ -435,7 +433,7 @@ def main():
     # Optimizers
     optimizer = optim.Adam(
         list(encoder.parameters()) + list(decoder.parameters()),
-        lr=args.lr if args.last_lr is None else args.last_lr,
+        lr=args.lr if checkpoint is None else checkpoint['last_lr'],
         betas=(0.5, 0.999)
     )
 
@@ -454,8 +452,7 @@ def main():
         print(f"Using ExponentialLR scheduler (gamma={gamma:.6f})")
     elif args.lr_scheduler == 'smart':
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=args.reduce_lr_factor,
-                                     patience=args.reduce_lr_patience, threshold=args.reduce_lr_threshold,
-                                     verbose=args.reduce_lr_verbose)
+                                     patience=args.reduce_lr_patience, threshold=args.reduce_lr_threshold)
         print(f"Using ReduceLROnPlateau scheduler (factor={args.reduce_lr_factor}, patience={args.reduce_lr_patience}, threshold={args.reduce_lr_threshold})")
     elif args.lr_scheduler is not None:
         raise ValueError(f"Unknown lr-scheduler: {args.lr_scheduler}. Use 'exp', 'smart', or leave empty.")
@@ -523,6 +520,7 @@ def main():
                 writer.add_scalar('Loss/Reconstruction', recon_loss, iteration)
                 writer.add_scalar('Loss/Perceptual', perc_loss, iteration)
                 writer.add_scalar('Loss/Total', kl_loss + recon_loss + perc_loss, iteration)
+                writer.add_scalar('Training/LearningRate', optimizer.param_groups[0]['lr'], iteration)
 
             # Print losses
             if iteration % args.plot_freq == 0:
