@@ -29,7 +29,7 @@ if nets.USE_CUDA:
     vgg = vgg.cuda()
 
 def perceptual_loss(x, x_recon):
-    return F.mse_loss(vgg(x), vgg(x_recon))
+    return F.mse_loss(vgg(x), vgg(x_recon), reduce='mean')
 
 def init_weights_xavier(m):
     """
@@ -226,7 +226,7 @@ def save_generated_images(decoder, output_dir, iteration, num_images, latent_dim
         cv2.imwrite(os.path.join(save_path, f"{i}.png"), img)
 
 
-def compute_vae_loss(encoder, decoder, images, sigma_sq):
+def compute_vae_loss(encoder, decoder, images, sigma_sq, args):
     """
     Compute VAE loss (reconstruction + KL divergence).
 
@@ -251,7 +251,7 @@ def compute_vae_loss(encoder, decoder, images, sigma_sq):
     # KL divergence: KL(q(z|x) || p(z)) where p(z) = N(0, I)
     # KL = -0.5 * sum(1 + logvar - mu^2 - exp(logvar))
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1)
-    kl_loss = kl_loss.mean()
+    kl_loss = args.beta * kl_loss.mean()
 
     # Reparameterization trick: z = mu + std * eps
     std = torch.exp(0.5 * logvar)
@@ -267,7 +267,7 @@ def compute_vae_loss(encoder, decoder, images, sigma_sq):
     recon_loss = recon_loss.mean()
 
     # Perceptual loss
-    perc_loss = perceptual_loss(images, reconstructed)
+    perc_loss = args.pi * perceptual_loss(images, reconstructed)
 
     # Total loss
     total_loss = kl_loss + recon_loss + perc_loss
@@ -313,6 +313,10 @@ def main():
                         help='Leaky ReLU slope (default: 0.2)')
     parser.add_argument('--sigma-sq', type=float, default=0.0001,
                         help='Variance parameter for reconstruction loss (default: 0.0001)')
+    parser.add_argument('--beta', type=float, default=1.0,
+                        help='Weight for KL divergence loss (default: 1.0)')
+    parser.add_argument('--pi', type=float, default=1.0,
+                        help='Weight for perceptual loss (default: 1.0)')
     parser.add_argument('--init-method', type=str, choices=['xavier', 'normal', 'kaiming_uniform'], default='kaiming_uniform',
                         help='Weight initialization method (default: kaiming_uniform)')
     parser.add_argument('--init-method-mode', type=str, choices=['fan_in', 'fan_out'], default='fan_in',
@@ -473,7 +477,7 @@ def main():
             # Forward pass and compute loss
             optimizer.zero_grad()
             total_loss, kl_loss, recon_loss, perc_loss, reconstructed = compute_vae_loss(
-                encoder, decoder, images, args.sigma_sq
+                encoder, decoder, images, args.sigma_sq, args=args
             )
 
             # Backward pass
