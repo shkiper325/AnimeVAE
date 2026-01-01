@@ -263,8 +263,10 @@ def main():
     parser = argparse.ArgumentParser(description='Train VAE for anime face generation')
 
     # Data paths
-    parser.add_argument('--data-path', type=str, default='data',
+    parser.add_argument('--train-path', type=str, default='data/train',
                         help='Path to training images directory')
+    parser.add_argument('--test-path', type=str, default='data/test',
+                        help='Path to test images directory')
     parser.add_argument('--output-dir', type=str, default='images',
                         help='Directory to save generated images')
     parser.add_argument('--models-dir', type=str, default='models',
@@ -364,13 +366,13 @@ def main():
         writer.add_text('Hyperparameters', hparams_text, 0)
 
     # Calculate epoch length
-    num_files = len([f for f in os.listdir(args.data_path)
-                     if os.path.isfile(os.path.join(args.data_path, f))])
+    num_files = len([f for f in os.listdir(args.train_path)
+                     if os.path.isfile(os.path.join(args.train_path, f))])
     epoch_len = num_files // args.batch_size
     print(f"Dataset: {num_files} images, {epoch_len} batches per epoch")
 
     # Create data loader
-    data_loader = load_images(args.data_path, args.image_size, args.batch_size)
+    data_loader = load_images(args.train_path, args.image_size, args.batch_size)
 
     # Create networks
     encoder, decoder = nets.create_vae(
