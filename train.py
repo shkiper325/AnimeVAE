@@ -22,7 +22,11 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import ExponentialLR
 
 from torchvision.models import vgg19
+
+import nets
 vgg = vgg19(pretrained=True).features[:36].eval()
+if nets.USE_CUDA:
+    vgg = vgg.cuda()
 
 def perceptual_loss(x, x_recon):
     return F.mse_loss(vgg(x), vgg(x_recon))
