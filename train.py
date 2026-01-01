@@ -19,7 +19,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
-from torch.optim.lr_scheduler import ExponentialLR
+from torch.optim.lr_scheduler import ExponentialLR, ReduceLROnPlateau
 
 from torchvision.models import vgg19
 
@@ -309,6 +309,8 @@ def main():
                         help='Batch size for training (default: 16)')
     parser.add_argument('--lr', type=float, default=0.001,
                         help='Learning rate (default: 0.001)')
+    parser.add_argument('--lr-scheduler', type=str, default=None,
+                        help='LR scheduler: exp (ExponentialLR), smart (ReduceLROnPlateau), or None (default: None)')
     parser.add_argument('--leaky-relu-slope', type=float, default=0.2,
                         help='Leaky ReLU slope (default: 0.2)')
     parser.add_argument('--sigma-sq', type=float, default=0.0001,
@@ -436,9 +438,17 @@ def main():
         optimizer.load_state_dict(checkpoint['optimizer'])
 
     # LR decay scheduler
-    total_steps = args.epochs * epoch_len
-    gamma = np.exp(np.log(0.001) / total_steps) # Final lr is 0.1% of initial
-    scheduler = ExponentialLR(optimizer, gamma=gamma, last_epoch=iteration - 1 if iteration > 0 else -1)
+    scheduler = None
+    if args.lr_scheduler == 'exp':
+        total_steps = args.epochs * epoch_len
+        gamma = np.exp(np.log(0.001) / total_steps)  # Final lr is 0.1% of initial
+        scheduler = ExponentialLR(optimizer, gamma=gamma, last_epoch=iteration - 1 if iteration > 0 else -1)
+        print(f"Using ExponentialLR scheduler (gamma={gamma:.6f})")
+    elif args.lr_scheduler == 'smart':
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+        print("Using ReduceLROnPlateau scheduler")
+    elif args.lr_scheduler is not None:
+        raise ValueError(f"Unknown lr-scheduler: {args.lr_scheduler}. Use 'exp', 'smart', or leave empty.")
 
     # Initialize weights for cold start
     if cold_start:
@@ -485,7 +495,11 @@ def main():
             optimizer.step()
 
             # Update learning rate
-            scheduler.step()
+            if scheduler is not None:
+                if args.lr_scheduler == 'exp':
+                    scheduler.step()
+                elif args.lr_scheduler == 'smart':
+                    scheduler.step(total_loss)
 
             iteration += 1
 
