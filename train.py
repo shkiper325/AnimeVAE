@@ -21,11 +21,12 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ExponentialLR, ReduceLROnPlateau
-
 from torchvision.models import vgg19
 
 import nets
+
 vgg = vgg19(pretrained=True).features[:36].eval()
+
 if nets.USE_CUDA:
     vgg = vgg.cuda()
 
@@ -119,6 +120,8 @@ def save_checkpoint(encoder, decoder, optimizer, epoch, iteration, args, models_
         args: Training arguments
         models_dir (str): Directory to save checkpoint
     """
+    global all_jpg_filenames, curr_jpg_idx
+
     os.makedirs(models_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -132,12 +135,16 @@ def save_checkpoint(encoder, decoder, optimizer, epoch, iteration, args, models_
         'epoch': epoch,
         'iteration': iteration,
         'last_lr': optimizer.param_groups[0]['lr'],
-        'args': vars(args)
+        'args': vars(args),
+        'all_jpg_filenames' : all_jpg_filenames,
+        'curr_jpg_idx' : curr_jpg_idx
     }
 
     torch.save(checkpoint, filepath)
     print(f"Saved checkpoint: {filepath}")
 
+all_jpg_filenames = None
+curr_jpg_idx = None
 
 def load_images(data_path, image_size, batch_size):
     """
@@ -152,20 +159,24 @@ def load_images(data_path, image_size, batch_size):
         np.ndarray: Batch of images with shape (batch_size, 3, image_size, image_size)
                    normalized to [-1, 1] range
     """
-    if not os.path.exists(data_path):
-        raise FileNotFoundError(f"Data path not found: {data_path}")
+    global all_jpg_filenames, curr_jpg_idx
 
-    filenames = os.listdir(data_path)
-    if not filenames:
-        raise ValueError(f"No files found in: {data_path}")
+    if all_jpg_filenames is None:
+        if not os.path.exists(data_path):
+            raise FileNotFoundError(f"Data path not found: {data_path}")
+
+        all_jpg_filenames = os.listdir(data_path)
+        if not all_jpg_filenames:
+            raise ValueError(f"No files found in: {data_path}")
+        
+        random.shuffle(all_jpg_filenames)
+        curr_jpg_idx = 0
 
     batch = np.empty((batch_size, 3, image_size, image_size), dtype=np.float32)
     batch_idx = 0
 
     while True:
-        random.shuffle(filenames)
-
-        for filename in filenames:
+        for filename in all_jpg_filenames[curr_jpg_idx % len(all_jpg_filenames):]:
             # Read and preprocess image
             img_path = os.path.join(data_path, filename)
             img = cv2.imread(img_path)
@@ -183,10 +194,14 @@ def load_images(data_path, image_size, batch_size):
             batch[batch_idx] = img
             batch_idx += 1
 
+            curr_jpg_idx += 1
+
             # Yield when batch is full
             if batch_idx == batch_size:
                 yield batch.copy()
                 batch_idx = 0
+
+        random.shuffle(all_jpg_filenames)
 
 
 def save_generated_images(decoder, output_dir, iteration, num_images, latent_dim, use_cuda):
@@ -422,8 +437,11 @@ def main():
         if latest_model:
             print(f"Loading latest checkpoint: {latest_model}")
             checkpoint = torch.load(latest_model)
-            start_epoch = checkpoint.get('epoch', 0)
-            iteration = checkpoint.get('iteration', 0)
+            start_epoch = checkpoint['epoch']
+            iteration = checkpoint['iteration']
+            global all_jpg_filenames, curr_jpg_idx
+            all_jpg_filenames = checkpoint['all_jpg_filenames']
+            curr_jpg_idx = checkpoint['curr_jpg_idx']
             cold_start = False
             print(f"Resumed from epoch {start_epoch}, iteration {iteration}")
         else:
@@ -448,7 +466,7 @@ def main():
     scheduler = None
     if args.lr_scheduler == 'exp':
         total_steps = args.epochs * epoch_len
-        gamma = np.exp(np.log(0.0001) / total_steps)  # Final lr is 0.01% of initial
+        gamma = np.exp(np.log(0.001) / total_steps)  # Final lr is 0.1% of initial
         scheduler = ExponentialLR(optimizer, gamma=gamma, last_epoch=iteration - 1 if iteration > 0 else -1)
         print(f"Using ExponentialLR scheduler (gamma={gamma:.6f})")
     elif args.lr_scheduler == 'smart':
@@ -486,7 +504,7 @@ def main():
         print(f"\nEpoch {epoch}/{args.epochs}")
 
         # Train for one epoch
-        for batch_idx in tqdm(range(epoch_len)) if args.progressbar else range(epoch_len):
+        for batch_idx in tqdm(range(epoch_len-(iteration%epoch_len))) if args.progressbar else range(epoch_len-(iteration%epoch_len)):
             # Get batch
             images = next(data_loader)
             images = torch.FloatTensor(images)
