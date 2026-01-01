@@ -315,6 +315,8 @@ def main():
                         help='Factor by which to reduce learning rate for ReduceLROnPlateau (default: 0.5)')
     parser.add_argument('--reduce-lr-patience', type=int, default=5,
                         help='Number of epochs with no improvement for ReduceLROnPlateau (default: 5)')
+    parser.add_argument('--reduce-lr-threshold', type=float, default=1e-4,
+                        help='Threshold for measuring new optimum for ReduceLROnPlateau (default: 1e-4)')
     parser.add_argument('--reduce-lr-verbose', action='store_true',
                         help='Print message when learning rate is reduced by ReduceLROnPlateau')
     parser.add_argument('--leaky-relu-slope', type=float, default=0.2,
@@ -452,8 +454,9 @@ def main():
         print(f"Using ExponentialLR scheduler (gamma={gamma:.6f})")
     elif args.lr_scheduler == 'smart':
         scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=args.reduce_lr_factor,
-                                     patience=args.reduce_lr_patience, verbose=args.reduce_lr_verbose)
-        print(f"Using ReduceLROnPlateau scheduler (factor={args.reduce_lr_factor}, patience={args.reduce_lr_patience})")
+                                     patience=args.reduce_lr_patience, threshold=args.reduce_lr_threshold,
+                                     verbose=args.reduce_lr_verbose)
+        print(f"Using ReduceLROnPlateau scheduler (factor={args.reduce_lr_factor}, patience={args.reduce_lr_patience}, threshold={args.reduce_lr_threshold})")
     elif args.lr_scheduler is not None:
         raise ValueError(f"Unknown lr-scheduler: {args.lr_scheduler}. Use 'exp', 'smart', or leave empty.")
 
