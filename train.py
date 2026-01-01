@@ -126,6 +126,7 @@ def save_checkpoint(encoder, decoder, optimizer, epoch, iteration, args, models_
         'optimizer': optimizer.state_dict(),
         'epoch': epoch,
         'iteration': iteration,
+        'last_lr': optimizer.param_groups[0]['lr'],
         'args': vars(args)
     }
 
@@ -392,32 +393,18 @@ def main():
         leaky_relu_slope=args.leaky_relu_slope
     )
 
-    # Optimizers
-    optimizer = optim.Adam(
-        list(encoder.parameters()) + list(decoder.parameters()),
-        lr=args.lr,
-        betas=(0.5, 0.999)
-    )
-
-    # LR decay scheduler
-    total_steps = args.epochs * epoch_len
-    gamma = np.exp(np.log(0.001) / total_steps) # Final lr is 0.1% of initial
-    scheduler = ExponentialLR(optimizer, gamma=gamma, last_epoch=total_steps)
-
     # Training state
     start_epoch = 0
     iteration = 0
     cold_start = True  # Track if this is a cold start
 
     # Auto-load latest checkpoint
+    checkpoint = None
     if not args.no_auto_load:
         latest_model = get_latest_model(args.models_dir)
         if latest_model:
             print(f"Loading latest checkpoint: {latest_model}")
             checkpoint = torch.load(latest_model)
-            encoder.load_state_dict(checkpoint['encoder'])
-            decoder.load_state_dict(checkpoint['decoder'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
             start_epoch = checkpoint.get('epoch', 0)
             iteration = checkpoint.get('iteration', 0)
             cold_start = False
@@ -426,6 +413,24 @@ def main():
             print(f"No checkpoint found in {args.models_dir}, starting from scratch")
     else:
         print("Auto-load disabled, starting from scratch")
+
+    # Optimizers
+    optimizer = optim.Adam(
+        list(encoder.parameters()) + list(decoder.parameters()),
+        lr=args.lr,
+        betas=(0.5, 0.999)
+    )
+
+    # Load optimizer state if resuming
+    if checkpoint is not None:
+        encoder.load_state_dict(checkpoint['encoder'])
+        decoder.load_state_dict(checkpoint['decoder'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+
+    # LR decay scheduler
+    total_steps = args.epochs * epoch_len
+    gamma = np.exp(np.log(0.001) / total_steps) # Final lr is 0.1% of initial
+    scheduler = ExponentialLR(optimizer, gamma=gamma, last_epoch=iteration - 1 if iteration > 0 else -1)
 
     # Initialize weights for cold start
     if cold_start:
