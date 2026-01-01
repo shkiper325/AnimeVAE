@@ -7,7 +7,8 @@ Supports command-line configuration for all hyperparameters and paths.
 import os
 import argparse
 import random
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 import glob
 
 import numpy as np
@@ -480,6 +481,7 @@ def main():
 
     # Training loop
     print(f"Starting training for {args.epochs} epochs")
+    training_start_time = time.time()
     for epoch in range(start_epoch, args.epochs):
         print(f"\nEpoch {epoch}/{args.epochs}")
 
@@ -524,7 +526,20 @@ def main():
 
             # Print losses
             if iteration % args.plot_freq == 0:
-                print(f"  [{batch_idx}/{epoch_len}] KL: {kl_loss:.4f}, Recon: {recon_loss:.4f}, Perc: {perc_loss:.4f}")
+                # Calculate ETA
+                elapsed_time = time.time() - training_start_time
+                elapsed_str = str(timedelta(seconds=int(elapsed_time)))
+                total_iterations = args.epochs * epoch_len
+                remaining_iterations = total_iterations - iteration
+
+                if iteration > 0:
+                    avg_time_per_iter = elapsed_time / iteration
+                    eta_seconds = avg_time_per_iter * remaining_iterations
+                    eta_str = str(timedelta(seconds=int(eta_seconds)))
+                else:
+                    eta_str = "calculating..."
+
+                print(f"  [{batch_idx}/{epoch_len}] KL: {kl_loss:.4f}, Recon: {recon_loss:.4f}, Perc: {perc_loss:.4f}, Elapsed: {elapsed_str}, ETA: {eta_str}")
 
                 # Log images to TensorBoard
                 if writer is not None:
